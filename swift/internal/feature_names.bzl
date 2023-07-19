@@ -339,3 +339,7 @@ SWIFT_FEATURE__SUPPORTS_MACROS = "swift._supports_macros"
 
 # Pass -warnings-as-errors to the compiler.
 SWIFT_FEATURE_TREAT_WARNINGS_AS_ERRORS = "swift.treat_warnings_as_errors"
+
+# A feature that adds target_name in output path to support building
+# multiple frameworks with different target name, but same module name.
+SWIFT_FEATURE_ADD_TARGET_NAME_TO_OUTPUT = "swift.add_target_name_to_output"

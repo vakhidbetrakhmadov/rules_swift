@@ -214,6 +214,7 @@ def _create_xctest_runner(name, actions, executable, xctest_runner_template):
     xctest_runner = derived_files.xctest_runner_script(
         actions = actions,
         target_name = name,
+        add_target_name_to_output_path = False,
     )
 
     actions.expand_template(
@@ -236,7 +237,7 @@ def _swift_binary_impl(ctx):
 
     _, linking_outputs, providers = _swift_linking_rule_impl(
         ctx,
-        binary_path = ctx.label.name,
+        binary_path = derived_files.path(ctx, ctx.label.name),
         feature_configuration = feature_configuration,
         swift_toolchain = swift_toolchain,
     )
