@@ -2438,7 +2438,7 @@ def compile(
     # We need this when generating the VFS overlay file and also when
     # configuring inputs for the compile action, so it's best to precompute it
     # here.
-    if is_feature_enabled(
+    if all_compile_outputs and is_feature_enabled(
         feature_configuration = feature_configuration,
         feature_name = SWIFT_FEATURE_VFSOVERLAY,
     ):
@@ -2455,7 +2455,7 @@ def compile(
     else:
         vfsoverlay_file = None
 
-    if is_feature_enabled(
+    if all_compile_outputs and is_feature_enabled(
         feature_configuration = feature_configuration,
         feature_name = SWIFT_FEATURE_USE_EXPLICIT_SWIFT_MODULE_MAP,
     ):
@@ -2515,7 +2515,7 @@ def compile(
         **struct_fields(compile_outputs)
     )
 
-    if split_derived_file_generation:
+    if all_derived_outputs:
         run_toolchain_action(
             actions = actions,
             action_name = swift_action_names.DERIVE_FILES,
@@ -2526,35 +2526,36 @@ def compile(
             swift_toolchain = swift_toolchain,
         )
 
-    run_toolchain_action(
-        actions = actions,
-        action_name = swift_action_names.COMPILE,
-        feature_configuration = feature_configuration,
-        outputs = all_compile_outputs,
-        prerequisites = prerequisites,
-        progress_message = "Compiling Swift module %{label}",
-        swift_toolchain = swift_toolchain,
-    )
+    if all_compile_outputs:
+        run_toolchain_action(
+            actions = actions,
+            action_name = swift_action_names.COMPILE,
+            feature_configuration = feature_configuration,
+            outputs = all_compile_outputs,
+            prerequisites = prerequisites,
+            progress_message = "Compiling Swift module %{label}",
+            swift_toolchain = swift_toolchain,
+        )
 
-    # Dump AST has to run in its own action because `-dump-ast` is incompatible
-    # with emitting dependency files, which compile/derive files use when
-    # compiling via the worker.
-    # Given usage of AST files is expected to be limited compared to other
-    # compile outputs, moving generation off of the critical path is likely
-    # a reasonable tradeoff for the additional action.
-    run_toolchain_action(
-        actions = actions,
-        action_name = swift_action_names.DUMP_AST,
-        feature_configuration = feature_configuration,
-        outputs = compile_outputs.ast_files,
-        prerequisites = prerequisites,
-        progress_message = "Dumping Swift AST for %{label}",
-        swift_toolchain = swift_toolchain,
-    )
+        # Dump AST has to run in its own action because `-dump-ast` is
+        # incompatible with emitting dependency files, which compile/derive
+        # files use when compiling via the worker.
+        # Given usage of AST files is expected to be limited compared to other
+        # compile outputs, moving generation off of the critical path is likely
+        # a reasonable tradeoff for the additional action.
+        run_toolchain_action(
+            actions = actions,
+            action_name = swift_action_names.DUMP_AST,
+            feature_configuration = feature_configuration,
+            outputs = compile_outputs.ast_files,
+            prerequisites = prerequisites,
+            progress_message = "Dumping Swift AST for %{label}",
+            swift_toolchain = swift_toolchain,
+        )
 
     # If a header and module map were generated for this Swift module, attempt
     # to precompile the explicit module for that header as well.
-    if generated_header_name and not is_feature_enabled(
+    if generated_header_name and compile_outputs.generated_header_file and not is_feature_enabled(
         feature_configuration = feature_configuration,
         feature_name = SWIFT_FEATURE_NO_GENERATED_MODULE_MAP,
     ):
@@ -2580,11 +2581,26 @@ def compile(
     else:
         precompiled_module = None
 
-    compilation_context = create_compilation_context(
-        defines = defines,
-        srcs = srcs,
-        transitive_modules = transitive_modules,
-    )
+    if all_compile_outputs:
+        compilation_context = create_compilation_context(
+            defines = defines,
+            srcs = srcs,
+            transitive_modules = transitive_modules,
+        )
+        swift = create_swift_module(
+            ast_files = compile_outputs.ast_files,
+            defines = defines,
+            indexstore = compile_outputs.indexstore_directory,
+            plugins = depset(plugins),
+            swiftdoc = compile_outputs.swiftdoc_file,
+            swiftinterface = compile_outputs.swiftinterface_file,
+            swiftmodule = compile_outputs.swiftmodule_file,
+            swiftsourceinfo = compile_outputs.swiftsourceinfo_file,
+            symbol_graph = compile_outputs.symbol_graph_directory,
+        )
+    else:
+        compilation_context = None
+        swift = None
 
     module_context = create_module(
         name = module_name,
@@ -2603,17 +2619,7 @@ def compile(
         ),
         compilation_context = compilation_context,
         is_system = False,
-        swift = create_swift_module(
-            ast_files = compile_outputs.ast_files,
-            defines = defines,
-            indexstore = compile_outputs.indexstore_directory,
-            plugins = depset(plugins),
-            swiftdoc = compile_outputs.swiftdoc_file,
-            swiftinterface = compile_outputs.swiftinterface_file,
-            swiftmodule = compile_outputs.swiftmodule_file,
-            swiftsourceinfo = compile_outputs.swiftsourceinfo_file,
-            symbol_graph = compile_outputs.symbol_graph_directory,
-        ),
+        swift = swift,
     )
 
     cc_compilation_outputs = cc_common.create_compilation_outputs(
@@ -2914,6 +2920,25 @@ def _declare_compile_outputs(
             needed as configurator prerequisites nor are processed further but
             which should also be tracked as outputs of the compilation action.
     """
+    if not srcs:
+        return (
+            struct(
+                ast_files = [],
+                generated_header_file = None,
+                generated_module_map_file = None,
+                indexstore_directory = None,
+                macro_expansion_directory = None,
+                symbol_graph_directory = None,
+                object_files = [],
+                output_file_map = None,
+                derived_files_output_file_map = None,
+                swiftdoc_file = None,
+                swiftinterface_file = None,
+                swiftmodule_file = None,
+                swiftsourceinfo_file = None,
+            ),
+            [],
+        )
 
     # First, declare "constant" outputs (outputs whose nature doesn't change
     # depending on compilation mode, like WMO vs. non-WMO).
@@ -3325,23 +3350,6 @@ def output_groups_from_other_compilation_outputs(*, other_compilation_outputs):
         ])
 
     return output_groups
-
-def swift_library_output_map(name):
-    """Returns the dictionary of implicit outputs for a `swift_library`.
-
-    This function is used to specify the `outputs` of the `swift_library` rule;
-    as such, its arguments must be named exactly the same as the attributes to
-    which they refer.
-
-    Args:
-        name: The name of the target being built.
-
-    Returns:
-        The implicit outputs dictionary for a `swift_library`.
-    """
-    return {
-        "archive": "lib{}.a".format(name),
-    }
 
 def _index_store_path_overridden(copts):
     """Checks if index_while_building must be disabled.

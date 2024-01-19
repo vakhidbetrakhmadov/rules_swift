@@ -23,7 +23,6 @@ load(
 load(
     ":compiling.bzl",
     "output_groups_from_other_compilation_outputs",
-    "swift_library_output_map",
 )
 load(
     ":feature_names.bzl",
@@ -211,30 +210,36 @@ def _swift_library_impl(ctx):
         )
     )
 
+    direct_output_files = []
+
     # Include the generated header (if any) as a rule output, so that a user
     # building the target can see its path and view it easily.
-    generated_header_file = None
     if generated_header_name:
         for file in module_context.clang.compilation_context.direct_headers:
             if file.short_path.endswith(generated_header_name):
-                generated_header_file = file
+                direct_output_files.append(file)
                 break
 
-    direct_output_files = compact([
-        generated_header_file,
-        module_context.clang.precompiled_module,
-        module_context.swift.swiftdoc,
-        module_context.swift.swiftinterface,
-        module_context.swift.swiftmodule,
-        module_context.swift.swiftsourceinfo,
-        linking_output.library_to_link.static_library,
-        linking_output.library_to_link.pic_static_library,
-    ])
+        direct_output_files.append(module_context.clang.precompiled_module)
+
+    if module_context.swift:
+        direct_output_files.extend([
+            module_context.swift.swiftdoc,
+            module_context.swift.swiftinterface,
+            module_context.swift.swiftmodule,
+            module_context.swift.swiftsourceinfo,
+        ])
+
+    if linking_output:
+        direct_output_files.extend([
+            linking_output.library_to_link.static_library,
+            linking_output.library_to_link.pic_static_library,
+        ])
 
     implicit_deps_providers = swift_toolchain.implicit_deps_providers
     providers = [
         DefaultInfo(
-            files = depset(direct_output_files),
+            files = depset(compact(direct_output_files)),
             runfiles = ctx.runfiles(
                 collect_data = True,
                 collect_default = True,
@@ -274,7 +279,7 @@ def _swift_library_impl(ctx):
         feature_configuration = feature_configuration,
         is_test = ctx.attr.testonly,
         module_context = module_context,
-        libraries_to_link = [linking_output.library_to_link],
+        libraries_to_link = [linking_output.library_to_link] if linking_output else [],
         user_link_flags = linkopts,
         swift_toolchain = swift_toolchain,
     ))
@@ -283,9 +288,10 @@ def _swift_library_impl(ctx):
 
 swift_library = rule(
     attrs = dicts.add(
-        swift_common.library_rule_attrs(additional_deps_aspects = [
-            swift_clang_module_aspect,
-        ]),
+        swift_common.library_rule_attrs(
+            additional_deps_aspects = [swift_clang_module_aspect],
+            requires_srcs = False,
+        ),
         {
             "private_deps": swift_deps_attr(
                 aspects = [swift_clang_module_aspect],
@@ -301,7 +307,6 @@ dependent for linking, but artifacts/flags required for compilation (such as
     doc = """\
 Compiles and links Swift code into a static library and Swift module.
 """,
-    outputs = swift_library_output_map,
     implementation = _swift_library_impl,
     fragments = ["cpp"],
 )

@@ -224,6 +224,9 @@ def create_linking_context_from_compilation_outputs(
         context to be propagated by the caller's `CcInfo` provider and the
         artifact representing the library that was linked, respectively.
     """
+    has_objects = (len(compilation_outputs.objects) != 0 or
+                   len(compilation_outputs.pic_objects) != 0)
+
     extra_linking_contexts = [
         cc_info.linking_context
         for cc_info in swift_toolchain.implicit_deps_providers.cc_infos
@@ -286,7 +289,7 @@ def create_linking_context_from_compilation_outputs(
             feature_name = SWIFT_FEATURE__FORCE_ALWAYSLINK_TRUE,
         )
 
-    if is_feature_enabled(
+    if has_objects and is_feature_enabled(
         feature_configuration = feature_configuration,
         feature_name = SWIFT_FEATURE_LLD_GC_WORKAROUND,
     ):
@@ -301,7 +304,7 @@ def create_linking_context_from_compilation_outputs(
             ),
         )
 
-    if is_feature_enabled(
+    if has_objects and is_feature_enabled(
         feature_configuration = feature_configuration,
         feature_name = SWIFT_FEATURE_OBJC_LINK_FLAGS,
     ):
@@ -320,26 +323,51 @@ def create_linking_context_from_compilation_outputs(
     if not name:
         name = label.name
 
-    if is_test:
+    if has_objects and is_test:
         developer_paths_linkopts = developer_dirs_linkopts(swift_toolchain.developer_dirs)
     else:
         developer_paths_linkopts = []
 
-    return cc_common.create_linking_context_from_compilation_outputs(
-        actions = actions,
-        feature_configuration = get_cc_feature_configuration(
-            feature_configuration,
-        ),
-        cc_toolchain = swift_toolchain.cc_toolchain_info,
-        compilation_outputs = compilation_outputs,
-        name = name,
-        user_link_flags = user_link_flags + developer_paths_linkopts,
-        linking_contexts = linking_contexts + extra_linking_contexts,
-        alwayslink = alwayslink,
-        additional_inputs = additional_inputs,
-        disallow_static_libraries = False,
-        disallow_dynamic_library = True,
-    )
+    user_link_flags = user_link_flags + developer_paths_linkopts
+
+    if has_objects:
+        (
+            linking_context,
+            linking_output
+        ) = cc_common.create_linking_context_from_compilation_outputs(
+            actions = actions,
+            feature_configuration = get_cc_feature_configuration(
+                feature_configuration,
+            ),
+            cc_toolchain = swift_toolchain.cc_toolchain_info,
+            compilation_outputs = compilation_outputs,
+            name = name,
+            user_link_flags = user_link_flags,
+            linking_contexts = linking_contexts + extra_linking_contexts,
+            alwayslink = alwayslink,
+            additional_inputs = additional_inputs,
+            disallow_static_libraries = False,
+            disallow_dynamic_library = True,
+        )
+    else:
+        extra_linking_contexts.append(
+            cc_common.create_linking_context(
+                linker_inputs = depset(
+                    direct = [
+                        cc_common.create_linker_input(
+                            owner = label,
+                            user_link_flags = user_link_flags,
+                        ),
+                    ],
+                ),
+            ),
+        )
+        linking_context = cc_common.merge_linking_contexts(
+            linking_contexts = linking_contexts + extra_linking_contexts,
+        )
+        linking_output = None
+
+    return linking_context, linking_output
 
 def malloc_linking_context(ctx):
     """Returns the linking context to use for the malloc implementation.

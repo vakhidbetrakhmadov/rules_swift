@@ -15,9 +15,15 @@ swift_library(
 )
 
 swift_library(
+    name = "sourceless_intermediate",
+    tags = FIXTURE_TAGS,
+    deps = ["first"],
+)
+
+swift_library(
     name = "second",
     srcs = ["second.swift"],
     module_name = "second",
     tags = FIXTURE_TAGS,
-    deps = ["first"],
+    deps = ["sourceless_intermediate"],
 )
