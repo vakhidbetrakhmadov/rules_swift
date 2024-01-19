@@ -508,6 +508,9 @@ def output_groups_from_linking_output(*, linking_output):
     """
     output_groups = {}
 
+    if not linking_output:
+        return output_groups
+
     lib = linking_output.library_to_link
     if lib == None:
         return output_groups
