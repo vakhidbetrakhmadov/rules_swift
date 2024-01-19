@@ -30,7 +30,7 @@ load(
     "SWIFT_FEATURE_ENABLE_LIBRARY_EVOLUTION",
     "SWIFT_FEATURE_SUPPORTS_PRIVATE_DEPS",
 )
-load(":linking.bzl", "new_objc_provider")
+load(":linking.bzl", "new_objc_provider", "output_groups_from_linking_output")
 load(":providers.bzl", "SwiftCompilerPluginInfo", "SwiftInfo", "SwiftToolchainInfo")
 load(":swift_clang_module_aspect.bzl", "swift_clang_module_aspect")
 load(":swift_common.bzl", "swift_common")
@@ -246,8 +246,11 @@ def _swift_library_impl(ctx):
                 files = ctx.files.data,
             ),
         ),
-        OutputGroupInfo(**output_groups_from_other_compilation_outputs(
-            other_compilation_outputs = other_compilation_outputs,
+        OutputGroupInfo(**dicts.add(
+            output_groups_from_other_compilation_outputs(
+                other_compilation_outputs = other_compilation_outputs,
+            ),
+            output_groups_from_linking_output(linking_output = linking_output),
         )),
         CcInfo(
             compilation_context = module_context.clang.compilation_context,

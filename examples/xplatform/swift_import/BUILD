@@ -17,9 +17,15 @@ swift_library(
 
 swift_import(
     name = "import",
-    archives = ["libdep.a"],
+    archives = [":dep_archive"],
     module_name = "dep",
     swiftmodule = ":foo",
+)
+
+filegroup(
+    name = "dep_archive",
+    srcs = [":dep"],
+    output_group = "archive",
 )
 
 get_swiftmodule(

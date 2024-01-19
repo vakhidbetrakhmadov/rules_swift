@@ -494,6 +494,47 @@ def new_objc_provider(
 
     return apple_common.new_objc_provider(**kwargs)
 
+def output_groups_from_linking_output(*, linking_output):
+    """Returns a dictionary of output groups from a linking output.
+
+    Args:
+        linking_output: The value in the second element of the tuple returned by
+            `swift_common.create_linking_context_from_compilation_outputs`.
+
+    Returns:
+        A `dict` whose keys are the names of output groups and values are
+        `depset`s of `File`s, which can be splatted as keyword arguments to the
+        `OutputGroupInfo` constructor.
+    """
+    output_groups = {}
+
+    lib = linking_output.library_to_link
+    if lib == None:
+        return output_groups
+
+    archive_file = []
+    dynamic_library = []
+
+    if lib.static_library != None:
+        archive_file.append(lib.static_library)
+    elif lib.pic_static_library != None:
+        archive_file.append(lib.pic_static_library)
+
+    if lib.resolved_symlink_dynamic_library != None:
+        dynamic_library.append(lib.resolved_symlink_dynamic_library)
+    elif lib.dynamic_library != None:
+        dynamic_library.append(lib.dynamic_library)
+
+    if lib.resolved_symlink_interface_library != None:
+        dynamic_library.append(lib.resolved_symlink_interface_library)
+    elif lib.interface_library != None:
+        dynamic_library.append(lib.interface_library)
+
+    output_groups["archive"] = depset(archive_file)
+    output_groups["dynamic_library"] = depset(dynamic_library)
+
+    return output_groups
+
 def register_link_binary_action(
         actions,
         additional_inputs,
