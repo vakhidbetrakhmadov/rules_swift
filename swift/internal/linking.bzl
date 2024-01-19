@@ -333,7 +333,7 @@ def create_linking_context_from_compilation_outputs(
     if has_objects:
         (
             linking_context,
-            linking_output
+            linking_output,
         ) = cc_common.create_linking_context_from_compilation_outputs(
             actions = actions,
             feature_configuration = get_cc_feature_configuration(
