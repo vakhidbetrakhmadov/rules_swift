@@ -19,6 +19,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -136,6 +137,12 @@ class SwiftRunner {
   // were imported by Swift code being compiled to the list of dependencies
   // declared in the build graph.
   int PerformLayeringCheck(std::ostream& stderr_stream, bool stdout_to_stderr);
+
+  // Promotes selected diagnostics while preserving the compiler's exit status.
+  void ProcessDiagnostics(std::string stderr_output, std::ostream& stderr_stream,
+                          int& exit_code);
+
+  std::set<std::string> warnings_as_errors_;
 
   // A mapping of Bazel placeholder strings to the actual paths that should be
   // substituted for them. Supports Xcode resolution on Apple OSes.

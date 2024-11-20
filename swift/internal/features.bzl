@@ -381,6 +381,15 @@ def warnings_as_errors_from_features(feature_configuration):
 
     return werror_warning_groups
 
+def legacy_warnings_as_errors_from_features(feature_configuration):
+    """Extracts legacy diagnostic IDs without affecting compiler warning groups."""
+    prefix = "swift.werror."
+    return [
+        feature[len(prefix):]
+        for feature in feature_configuration._enabled_features
+        if feature.startswith(prefix) and feature[len(prefix):] and feature[len(prefix):][0].islower()
+    ]
+
 def _check_allowlists(
         *,
         allowlists,

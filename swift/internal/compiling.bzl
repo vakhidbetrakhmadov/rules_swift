@@ -78,6 +78,7 @@ load(
     "is_feature_enabled",
     "upcoming_and_experimental_features",
     "warnings_as_errors_from_features",
+    "legacy_warnings_as_errors_from_features",
 )
 load(":module_maps.bzl", "write_module_map")
 load(":toolchain_utils.bzl", "SWIFT_TOOLCHAIN_TYPE")
@@ -849,6 +850,10 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
         feature_configuration = feature_configuration,
     )
 
+    warnings_as_errors = legacy_warnings_as_errors_from_features(
+        feature_configuration = feature_configuration,
+    )
+
     werror_warning_groups = warnings_as_errors_from_features(
         feature_configuration = feature_configuration,
     )
@@ -927,6 +932,7 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
         upcoming_features = upcoming_features,
         user_compile_flags = copts,
         werror_warning_groups = werror_warning_groups,
+        warnings_as_errors = warnings_as_errors,
         workspace_name = workspace_name,
         # Merge the compile outputs into the prerequisites.
         **struct_fields(compile_outputs)

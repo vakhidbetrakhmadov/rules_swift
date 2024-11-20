@@ -1634,7 +1634,11 @@ def command_line_objc_copts(compilation_mode, cpp_fragment, objc_fragment):
             ]
 
     clang_copts = cpp_fragment.objccopts + legacy_copts
-    return [copt for copt in clang_copts if copt != "-g"]
+    return [
+        ActionConfigInfo(
+            actions = [SWIFT_ACTION_COMPILE, SWIFT_ACTION_DERIVE_FILES],
+            configurators = [_legacy_warnings_as_errors_configurator],
+        ),copt for copt in clang_copts if copt != "-g"]
 
 def _output_or_file_map(output_file_map, outputs, args):
     """Adds the output file map or single object file to the command line."""
@@ -2688,3 +2692,10 @@ def _fail_if_flag_is_banned(copt):
             reason,
         ))
     return copt
+
+def _legacy_warnings_as_errors_configurator(prerequisites, args):
+    """Configures worker promotion of legacy diagnostic IDs."""
+    warnings = getattr(prerequisites, "warnings_as_errors", [])
+    if warnings:
+        args.add("-debug-diagnostic-names")
+        args.add_all(warnings, format_each = "-Xwrapped-swift=-warning-as-error=%s")
