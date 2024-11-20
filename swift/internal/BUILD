@@ -88,6 +88,7 @@ bzl_library(
         ":utils",
         ":vfsoverlay",
         ":wmo",
+        "//swift/toolchains/config:default_warnings_as_errors",
         "//swift:providers",
         "@bazel_skylib//lib:paths",
         "@bazel_skylib//lib:sets",

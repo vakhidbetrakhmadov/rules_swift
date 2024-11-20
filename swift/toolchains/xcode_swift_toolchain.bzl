@@ -97,6 +97,10 @@ load(
     "symbol_graph_action_configs",
 )
 load("//swift/toolchains/config:tool_config.bzl", "ToolConfigInfo")
+load(
+    "@build_bazel_rules_swift//swift/toolchains/config:default_warnings_as_errors.bzl",
+    "default_warnings_as_errors_features",
+)
 
 # TODO: Remove once we drop bazel 7.x
 _OBJC_PROVIDER_LINKING = hasattr(apple_common.new_objc_provider(), "linkopt")
@@ -630,6 +634,7 @@ def _xcode_swift_toolchain_impl(ctx):
         # `InternalImportsByDefault`.
         "swift.experimental.AccessLevelOnImport",
     ])
+    requested_features.extend(default_warnings_as_errors_features())
 
     if _is_xcode_at_least_version(xcode_config, "14.3"):
         requested_features.append(SWIFT_FEATURE__SUPPORTS_UPCOMING_FEATURES)

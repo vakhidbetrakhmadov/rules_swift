@@ -74,6 +74,11 @@ bzl_library(
     ],
 )
 
+bzl_library(
+    name = "default_warnings_as_errors",
+    srcs = ["default_warnings_as_errors.bzl"],
+)
+
 # Consumed by Bazel integration tests.
 filegroup(
     name = "for_bazel_tests",

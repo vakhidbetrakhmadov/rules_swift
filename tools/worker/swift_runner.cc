@@ -16,6 +16,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream> 
+#include <regex>
 
 #include "tools/common/bazel_substitutions.h"
 #include "tools/common/process.h"
@@ -116,8 +118,11 @@ SwiftRunner::SwiftRunner(const std::vector<std::string> &args,
 }
 
 int SwiftRunner::Run(std::ostream *stderr_stream, bool stdout_to_stderr) {
+  std::ostringstream captured_stderr_stream;
   int exit_code = RunSubProcess(
-      args_, &job_env_, stderr_stream, stdout_to_stderr);
+      args_, &job_env_, &captured_stderr_stream, stdout_to_stderr);
+
+  ProcessDiagnostics(captured_stderr_stream.str(), *stderr_stream, exit_code);
 
   if (exit_code != 0) {
     return exit_code;
@@ -329,6 +334,9 @@ bool SwiftRunner::ProcessArgument(
         changed = true;
       } else if (StripPrefix("-global-index-store-import-path=", new_arg)) {
         changed = true;
+      } else if (StripPrefix("-warning-as-error=", new_arg)) {
+        warnings_as_errors_.insert(std::string(new_arg));
+        changed = true;
       } else {
         // TODO(allevato): Report that an unknown wrapper arg was found and give
         // the caller a way to exit gracefully.
@@ -449,4 +457,73 @@ std::vector<std::string> SwiftRunner::ProcessArguments(
   }
 
   return new_args;
+}
+
+void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
+                        std::ostream &stderr_stream,
+                        int &exit_code) {
+  if (stderr_output.empty()) {
+    // Nothing to do if there was no output.
+    return;
+  }
+
+  // Match the "warning: " prefix on a message, also capturing the preceding
+  // ANSI color sequence if present.
+  std::regex const warning_pattern{"((\\x1b\\[(?:\\d+)(?:;\\d+)*m)?warning:\\s)"};
+  // When `-debug-diagnostic-names` is enabled, names are printed as identifiers
+  // in square brackets, either at the end of the string or followed by a
+  // semicolon (for wrapped diagnostics). Nothing guarantees this for the
+  // wrapped case -- it is just observed convention -- but it is sufficient
+  // while the compiler doesn't give us a more proper way to detect these.
+  std::regex const diagnostic_name_pattern{"\\[([_A-Za-z][_A-Za-z0-9]*)\\](;|$)"};
+
+  std::istringstream error_stream(stderr_output);
+  std::string line;    
+  while (getline(error_stream, line, '\n')) {
+      std::unique_ptr<std::string> modified_line;
+
+      std::smatch warning_matches;
+      if (std::regex_search(line, warning_matches, warning_pattern)) {
+        std::optional<std::string> ansi_sequence = warning_matches[2];
+
+        std::sregex_iterator diagnostic_names_begin(line.begin(), 
+                                                    line.end(), 
+                                                    diagnostic_name_pattern);
+        std::sregex_iterator diagnostic_names_end;
+        for (std::sregex_iterator i = diagnostic_names_begin; i != diagnostic_names_end; ++i) {
+          std::string diagnostic_name = (*i)[1].str();
+
+          if (warnings_as_errors_.find(diagnostic_name) == warnings_as_errors_.end()) {
+            continue;
+          }
+
+          std::ostringstream modified_line_stream;
+          modified_line_stream << warning_matches.prefix();
+          if (ansi_sequence.has_value()) {
+            modified_line_stream << "\x1b[1;31m"; // red color
+          }
+          modified_line_stream << "error: ";
+          modified_line_stream << warning_matches.suffix();
+          modified_line_stream << " (promoted_from_warning)";
+
+          modified_line = std::make_unique<std::string>(modified_line_stream.str());
+
+          if (exit_code == 0) {
+            exit_code = 1;
+          }
+
+          // In the event that there are multiple diagnostics on the same line
+          // (this is the case, for example, with "this is an error in Swift 6"
+          // messages), we can stop after we find the first match; the whole
+          // line will become an error.
+          break;
+        }
+      }
+
+      if (modified_line) {
+        stderr_stream << *modified_line << std::endl;
+      } else {
+        stderr_stream << line << std::endl;
+      }
+  }
 }

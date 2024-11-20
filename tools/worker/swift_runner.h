@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "tools/common/bazel_substitutions.h"
 #include "tools/common/temp_file.h"
@@ -122,6 +123,13 @@ class SwiftRunner {
   std::vector<std::string> ProcessArguments(
       const std::vector<std::string> &args);
 
+  // Upgrade any of the requested warnings to errors and then print all of the
+  // diagnostics to the given stream. Updates the exit code if necessary (to
+  // turn a previously successful compilation into a failing one).
+  void ProcessDiagnostics(std::string stderr_output,
+                          std::ostream &stderr_stream, 
+                          int &exit_code);
+
   // A mapping of Bazel placeholder strings to the actual paths that should be
   // substituted for them. Supports Xcode resolution on Apple OSes.
   bazel_rules_swift::BazelPlaceholderSubstitutions
@@ -176,6 +184,10 @@ class SwiftRunner {
   // `-index-store-path`. After running `swiftc` `index-import` copies relevant
   // index outputs into the `index_store_path` to integrate outputs with Bazel.
   std::string global_index_store_import_path_;
+
+  // A set containing the diagnostic IDs that should be upgraded from warnings
+  // to errors by the worker.
+  std::set<std::string> warnings_as_errors_;
 };
 
 #endif  // BUILD_BAZEL_RULES_SWIFT_TOOLS_WORKER_SWIFT_RUNNER_H_
