@@ -21,6 +21,7 @@ load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load(
     "//swift:providers.bzl",
     "SwiftInfo",
+    "SwiftWerrorConfiguration",
     "create_clang_module_inputs",
     "create_swift_module_context",
     "create_swift_module_inputs",
@@ -335,7 +336,8 @@ def compile(
         swift_toolchain,
         target_name,
         toolchain_type = SWIFT_TOOLCHAIN_TYPE,
-        workspace_name):
+        workspace_name,
+        werror_configuration = None):
     """Compiles a Swift module.
 
     Args:
@@ -647,6 +649,13 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
     upcoming_features, experimental_features = upcoming_and_experimental_features(
         feature_configuration = feature_configuration,
     )
+
+    werror_configuration = werror_configuration or SwiftWerrorConfiguration(
+        ids = [],
+        id_with_patterns = {},
+        no_id_patterns = []
+    )
+
     prerequisites = struct(
         additional_inputs = additional_inputs,
         always_include_headers = is_feature_enabled(
@@ -674,6 +683,7 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
         transitive_swiftmodules = transitive_swiftmodules,
         upcoming_features = upcoming_features,
         user_compile_flags = copts,
+        werror_configuration = werror_configuration,
         vfsoverlay_file = vfsoverlay_file,
         vfsoverlay_search_path = _SWIFTMODULES_VFS_ROOT,
         workspace_name = workspace_name,

@@ -675,3 +675,25 @@ def create_swift_module_inputs(
         swiftmodule = swiftmodule,
         swiftsourceinfo = swiftsourceinfo,
     )
+
+SwiftWerrorConfiguration = provider(
+    doc = """\
+Configuration for promoting specific Swift compilation warnings to errors.
+""",
+    fields = {
+        "ids": """\
+`List` of strings. Contains warning diagnostic IDs. Warnings with these IDs will be
+promoted to errors unconditionally.
+""",
+        "id_with_patterns": """\
+`Dict` mapping strings to lists of strings. Maps warning diagnostic IDs to multiple 
+regex patterns. A warning message must match at least one of the corresponding 
+patterns before it is promoted to an error.
+""",
+        "no_id_patterns": """\
+`List` of strings. Contains regex patterns for warning messages that do not have a
+diagnostic ID. These warnings will be promoted to errors if their message matches
+one of the patterns.
+""",
+    },
+)
