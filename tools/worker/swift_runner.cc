@@ -514,7 +514,8 @@ int SwiftRunner::Run(std::ostream* stderr_stream, bool stdout_to_stderr) {
   }
 
   std::ostringstream captured_stderr;
-  std::ostream* compiler_stderr = warnings_as_errors_.empty()
+  std::ostream* compiler_stderr = (warnings_as_errors_patterns_.empty() &&
+       no_id_warnings_as_errors_patterns_.empty())
                                       ? stderr_stream
                                       : &captured_stderr;
   if (hermetic_pcm_) {
@@ -774,8 +775,15 @@ std::vector<std::string> SwiftRunner::ParseArguments(Iterator itr) {
 
     absl::string_view value = arg;
     if (absl::ConsumePrefix(&value, "-Xwrapped-swift=")) {
-      if (absl::ConsumePrefix(&value, "-warning-as-error=")) {
-        warnings_as_errors_.insert(std::string(value));
+      if (absl::ConsumePrefix(&value, "-werror-id=")) {
+        warnings_as_errors_patterns_[std::string(value)] = {};
+      } else if (absl::ConsumePrefix(&value, "-werror-id-pattern.")) {
+        std::pair<std::string, std::string> id_and_pattern =
+            absl::StrSplit(value, absl::MaxSplits('=', 1));
+        warnings_as_errors_patterns_[id_and_pattern.first].insert(
+            id_and_pattern.second);
+      } else if (absl::ConsumePrefix(&value, "-werror-no-id-pattern=")) {
+        no_id_warnings_as_errors_patterns_.insert(std::string(value));
       } else if (absl::ConsumePrefix(&value, "-global-index-store-import-path=")) {
         global_index_store_import_path_ = std::string(value);
       } else if (absl::ConsumePrefix(&value, "-generated-header-rewriter=")) {
@@ -1027,6 +1035,29 @@ int SwiftRunner::PerformLayeringCheck(std::ostream& stderr_stream,
   return 0;
 }
 
+namespace {
+bool MatchesAny(const std::string& text, const std::set<std::string>& patterns) {
+  for (auto pattern : patterns) {
+      if (std::regex_search(text, std::regex(pattern))) return true;
+  }
+  return false;
+}
+
+std::unique_ptr<std::string> PromotedWarningLine(const std::smatch& warning_matches, const std::optional<std::string>& ansi_sequence) {
+  std::ostringstream modified_line_stream;
+  modified_line_stream << warning_matches.prefix();
+  if (ansi_sequence.has_value() && !ansi_sequence->empty()) {
+    modified_line_stream << "\x1b[1;31m"; // red color
+  }
+  modified_line_stream << "error: ";
+  modified_line_stream << warning_matches.suffix();
+  modified_line_stream << " (promoted_from_warning)";
+  
+  return std::make_unique<std::string>(modified_line_stream.str());
+}
+
+}  // namespace
+
 void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
                         std::ostream &stderr_stream,
                         int &exit_code) {
@@ -1043,55 +1074,57 @@ void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
   // semicolon (for wrapped diagnostics). Nothing guarantees this for the
   // wrapped case -- it is just observed convention -- but it is sufficient
   // while the compiler doesn't give us a more proper way to detect these.
-  std::regex const diagnostic_name_pattern{"\\[([_A-Za-z][_A-Za-z0-9]*)\\](;|$)"};
+  std::regex const diagnostic_name_pattern{"\\[([_A-Za-z][_A-Za-z0-9]*)\\]"};
 
   std::istringstream error_stream(stderr_output);
-  std::string line;    
+  std::string line;
   while (getline(error_stream, line, '\n')) {
-      std::unique_ptr<std::string> modified_line;
+    std::unique_ptr<std::string> modified_line;
 
-      std::smatch warning_matches;
-      if (std::regex_search(line, warning_matches, warning_pattern)) {
-        std::optional<std::string> ansi_sequence = warning_matches[2];
+    std::smatch warning_matches;
+    if (std::regex_search(line, warning_matches, warning_pattern)) {
+      std::optional<std::string> ansi_sequence = warning_matches[2];
 
-        std::sregex_iterator diagnostic_names_begin(line.begin(), 
-                                                    line.end(), 
-                                                    diagnostic_name_pattern);
-        std::sregex_iterator diagnostic_names_end;
-        for (std::sregex_iterator i = diagnostic_names_begin; i != diagnostic_names_end; ++i) {
-          std::string diagnostic_name = (*i)[1].str();
-
-          if (warnings_as_errors_.find(diagnostic_name) == warnings_as_errors_.end()) {
-            continue;
-          }
-
-          std::ostringstream modified_line_stream;
-          modified_line_stream << warning_matches.prefix();
-          if (ansi_sequence.has_value()) {
-            modified_line_stream << "\x1b[1;31m"; // red color
-          }
-          modified_line_stream << "error: ";
-          modified_line_stream << warning_matches.suffix();
-          modified_line_stream << " (promoted_from_warning)";
-
-          modified_line = std::make_unique<std::string>(modified_line_stream.str());
+      std::sregex_iterator diagnostic_names_begin(line.begin(), 
+                                                  line.end(), 
+                                                  diagnostic_name_pattern);
+      std::sregex_iterator diagnostic_names_end;
+      if (diagnostic_names_begin == diagnostic_names_end) {
+        if (MatchesAny(warning_matches.suffix(), no_id_warnings_as_errors_patterns_)) {
+          modified_line = PromotedWarningLine(warning_matches, ansi_sequence);
 
           if (exit_code == 0) {
             exit_code = 1;
           }
+        }
+      } else {
+        for (std::sregex_iterator i = diagnostic_names_begin; i != diagnostic_names_end; ++i) {
+          std::string diagnostic_name = (*i)[1].str();
 
-          // In the event that there are multiple diagnostics on the same line
-          // (this is the case, for example, with "this is an error in Swift 6"
-          // messages), we can stop after we find the first match; the whole
-          // line will become an error.
+          auto hasPatterns = warnings_as_errors_patterns_.find(diagnostic_name) != warnings_as_errors_patterns_.end();
+          if (!hasPatterns) {
+            continue;
+          }
+
+          std::set<std::string> patterns = warnings_as_errors_patterns_[diagnostic_name];
+          if (!patterns.empty() && !MatchesAny(warning_matches.suffix(), patterns)) {
+            continue;
+          }
+
+          modified_line = PromotedWarningLine(warning_matches, ansi_sequence);
+
+          if (exit_code == 0) {
+            exit_code = 1;
+          }
           break;
         }
       }
+    }
 
-      if (modified_line) {
-        stderr_stream << *modified_line << std::endl;
-      } else {
-        stderr_stream << line << std::endl;
-      }
+    if (modified_line) {
+      stderr_stream << *modified_line << std::endl;
+    } else {
+      stderr_stream << line << std::endl;
+    }
   }
 }

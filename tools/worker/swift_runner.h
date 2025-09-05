@@ -142,7 +142,8 @@ class SwiftRunner {
   void ProcessDiagnostics(std::string stderr_output, std::ostream& stderr_stream,
                           int& exit_code);
 
-  std::set<std::string> warnings_as_errors_;
+  std::map<std::string, std::set<std::string>> warnings_as_errors_patterns_;
+  std::set<std::string> no_id_warnings_as_errors_patterns_;
 
   // A mapping of Bazel placeholder strings to the actual paths that should be
   // substituted for them. Supports Xcode resolution on Apple OSes.

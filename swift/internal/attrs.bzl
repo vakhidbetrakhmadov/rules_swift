@@ -16,7 +16,7 @@
 
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("//swift:providers.bzl", "SwiftInfo", "SwiftToolsInfo")
+load("//swift:providers.bzl", "SwiftInfo", "SwiftToolsInfo", "SwiftWerrorConfiguration")
 load(":providers.bzl", "SwiftCompilerPluginInfo")
 
 C_HEADER_EXTENSIONS = ["h", "hh", "hpp", "hxx", "inc"]
@@ -342,6 +342,10 @@ swift.enable_embedded feature is on, this value will be automatically overridden
 to False, as the swift features that cause -force_load to be required (such as
 reflection) are not available in that mode.
 """,
+            ),
+            "werror_configuration": attr.label(
+                doc = "Configuration for promoting selected warnings to errors.",
+                providers = [SwiftWerrorConfiguration],
             ),
             "generated_header_name": attr.string(
                 doc = """\

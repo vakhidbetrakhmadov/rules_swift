@@ -449,3 +449,9 @@ swift_module_mapping(
     aliases = {},
     visibility = ["//visibility:private"],
 )
+
+bzl_library(
+    name = "swift_werror_configuration",
+    srcs = ["swift_werror_configuration.bzl"],
+    deps = [":providers"],
+)

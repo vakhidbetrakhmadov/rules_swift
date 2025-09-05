@@ -78,7 +78,6 @@ load(
     "is_feature_enabled",
     "upcoming_and_experimental_features",
     "warnings_as_errors_from_features",
-    "legacy_warnings_as_errors_from_features",
 )
 load(":module_maps.bzl", "write_module_map")
 load(":toolchain_utils.bzl", "SWIFT_TOOLCHAIN_TYPE")
@@ -444,7 +443,8 @@ def compile(
         target_name,
         toolchains = None,
         toolchain_type = SWIFT_TOOLCHAIN_TYPE,
-        workspace_name):
+        workspace_name,
+        werror_configuration = None):
     """Compiles a Swift module.
 
     Args:
@@ -521,6 +521,7 @@ def compile(
         toolchain_type: The toolchain type of the `swift_toolchain` which is
             used for the proper selection of the execution platform inside
             `run_toolchain_action`.
+        werror_configuration: Optional SwiftWerrorConfiguration for diagnostic promotion.
         workspace_name: The name of the workspace for which the code is being
              compiled, which is used to determine unique file paths for some
              outputs.
@@ -850,10 +851,6 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
         feature_configuration = feature_configuration,
     )
 
-    warnings_as_errors = legacy_warnings_as_errors_from_features(
-        feature_configuration = feature_configuration,
-    )
-
     werror_warning_groups = warnings_as_errors_from_features(
         feature_configuration = feature_configuration,
     )
@@ -932,7 +929,7 @@ to use swift_common.compile(include_dev_srch_paths = ...) instead.\
         upcoming_features = upcoming_features,
         user_compile_flags = copts,
         werror_warning_groups = werror_warning_groups,
-        warnings_as_errors = warnings_as_errors,
+        werror_configuration = werror_configuration,
         workspace_name = workspace_name,
         # Merge the compile outputs into the prerequisites.
         **struct_fields(compile_outputs)

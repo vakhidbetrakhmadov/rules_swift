@@ -1637,7 +1637,7 @@ def command_line_objc_copts(compilation_mode, cpp_fragment, objc_fragment):
     return [
         ActionConfigInfo(
             actions = [SWIFT_ACTION_COMPILE, SWIFT_ACTION_DERIVE_FILES],
-            configurators = [_legacy_warnings_as_errors_configurator],
+            configurators = [_custom_werror_configurator],
         ),copt for copt in clang_copts if copt != "-g"]
 
 def _output_or_file_map(output_file_map, outputs, args):
@@ -2693,9 +2693,13 @@ def _fail_if_flag_is_banned(copt):
         ))
     return copt
 
-def _legacy_warnings_as_errors_configurator(prerequisites, args):
-    """Configures worker promotion of legacy diagnostic IDs."""
-    warnings = getattr(prerequisites, "warnings_as_errors", [])
-    if warnings:
-        args.add("-debug-diagnostic-names")
-        args.add_all(warnings, format_each = "-Xwrapped-swift=-warning-as-error=%s")
+def _custom_werror_configurator(prerequisites, args):
+    """Adds worker flags independently of upstream compiler warning groups."""
+    configuration = getattr(prerequisites, "werror_configuration", None)
+    if not configuration or not (configuration.ids or configuration.id_with_patterns or configuration.no_id_patterns):
+        return
+    args.add("-debug-diagnostic-names")
+    args.add_all(configuration.ids, format_each = "-Xwrapped-swift=-werror-id=%s")
+    args.add_all(configuration.no_id_patterns, format_each = "-Xwrapped-swift=-werror-no-id-pattern=%s")
+    for diagnostic_id, patterns in configuration.id_with_patterns.items():
+        args.add_all(patterns, format_each = "-Xwrapped-swift=-werror-id-pattern.%s=%%s" % diagnostic_id)
