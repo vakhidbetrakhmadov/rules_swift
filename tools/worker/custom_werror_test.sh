@@ -47,9 +47,11 @@ export WERROR_DIAGNOSTIC='warning: selected message [chosen_id]'
 status=0
 printf '%s\n' \
     '{"requestId":1,"arguments":["-Xwrapped-swift=-werror-id=chosen_id"],"inputs":[]}' \
-    '{"requestId":2,"arguments":[],"inputs":[]}' |
+    '{"requestId":2,"arguments":[],"inputs":[]}' \
+    '{"requestId":3,"arguments":["-Xwrapped-swift=-werror-id-pattern.chosen_id=\\bselected\\b"],"inputs":[]}' |
     "$worker" --persistent_worker "$compiler" >responses.json 2>worker.log || status=$?
 [[ "$status" == 254 ]]
-grep -F '"exitCode":1' responses.json
-grep -F '"exitCode":0' responses.json
-grep -F '"requestId":2' responses.json
+tr '}' '\n' <responses.json >responses.txt
+grep -F '"requestId":1' responses.txt | grep -F '"exitCode":1'
+grep -F '"requestId":2' responses.txt | grep -F '"exitCode":0'
+grep -F '"requestId":3' responses.txt | grep -F '"exitCode":1'

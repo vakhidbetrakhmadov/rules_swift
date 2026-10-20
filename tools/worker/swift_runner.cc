@@ -607,8 +607,12 @@ bool SwiftRunner::ProcessPossibleResponseFile(
     // Arguments in response files might be quoted/escaped. When forcing
     // response files, unescape them before storing them in the processed
     // argument vector.
-    args.push_back(force_response_file_ ? Unescape(arg_from_file)
-                                        : arg_from_file);
+    // Custom regex flags are multiline worker arguments, not shell syntax.
+    // Preserve backslashes and quotes inside the configured pattern.
+    bool is_werror =
+        absl::StartsWith(arg_from_file, "-Xwrapped-swift=-werror-");
+    args.push_back(force_response_file_ && !is_werror ? Unescape(arg_from_file)
+                                                      : arg_from_file);
   }
 
   auto parsed_args = ParseArguments(args);
