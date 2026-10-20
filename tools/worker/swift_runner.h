@@ -139,8 +139,8 @@ class SwiftRunner {
   int PerformLayeringCheck(std::ostream& stderr_stream, bool stdout_to_stderr);
 
   // Promotes selected diagnostics while preserving the compiler's exit status.
-  void ProcessDiagnostics(std::string stderr_output, std::ostream& stderr_stream,
-                          int& exit_code);
+  void ProcessDiagnostics(std::string stderr_output,
+                          std::ostream& stderr_stream, int& exit_code);
 
   std::map<std::string, std::set<std::string>> warnings_as_errors_patterns_;
   std::set<std::string> no_id_warnings_as_errors_patterns_;

@@ -1,7 +1,9 @@
+load("//mixed_language:mixed_language_library.bzl", "mixed_language_library")
 load(
     "//swift:swift_library.bzl",
     "swift_library",
 )
+load("//swift:swift_werror_configuration.bzl", "swift_werror_configuration")
 load("//test/fixtures:common.bzl", "FIXTURE_TAGS")
 
 package(
@@ -66,5 +68,32 @@ swift_library(
         "swift.werror.DeprecatedDeclaration",
         "swift.werror.UnusedResult",
     ],
+    tags = FIXTURE_TAGS,
+)
+
+swift_werror_configuration(
+    name = "custom_configuration",
+    id_with_patterns = {"filtered_id": ["selected message"]},
+    ids = ["chosen_id"],
+    no_id_patterns = ["unidentified message"],
+)
+
+swift_library(
+    name = "custom_configuration_library",
+    srcs = ["Empty.swift"],
+    features = [
+        "swift.split_derived_files_generation",
+        "swift.werror.DeprecatedDeclaration",
+    ],
+    tags = FIXTURE_TAGS,
+    werror_configuration = ":custom_configuration",
+)
+
+mixed_language_library(
+    name = "mixed_custom_configuration",
+    hdrs = ["Empty.h"],
+    clang_srcs = [],
+    swift_srcs = ["Empty.swift"],
+    swift_werror_configuration = ":custom_configuration",
     tags = FIXTURE_TAGS,
 )

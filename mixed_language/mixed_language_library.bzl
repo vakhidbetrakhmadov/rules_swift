@@ -167,6 +167,7 @@ def mixed_language_library(
             It is preferred that you add defines directly to `swift_copts`, only
             using this feature in the rare case that a library needs to
             propagate a symbol up to those that depend on it.
+        swift_werror_configuration: Optional configuration for promoting Swift diagnostics to errors.
         swift_plugins: A list of Swift plugins for the swift library.
         swift_srcs: The sources for the swift library.
         swiftc_inputs: Additional files that are referenced using

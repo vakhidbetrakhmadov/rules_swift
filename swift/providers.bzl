@@ -760,6 +760,7 @@ def create_swift_module_inputs(
         swiftsourceinfo = swiftsourceinfo,
     )
 
+# buildifier: disable=name-conventions
 SwiftWerrorConfiguration = provider(
     doc = """\
 Configuration for promoting specific Swift compilation warnings to errors.
@@ -770,8 +771,8 @@ Configuration for promoting specific Swift compilation warnings to errors.
 promoted to errors unconditionally.
 """,
         "id_with_patterns": """\
-`Dict` mapping strings to lists of strings. Maps warning diagnostic IDs to multiple 
-regex patterns. A warning message must match at least one of the corresponding 
+`Dict` mapping strings to lists of strings. Maps warning diagnostic IDs to multiple
+regex patterns. A warning message must match at least one of the corresponding
 patterns before it is promoted to an error.
 """,
         "no_id_patterns": """\

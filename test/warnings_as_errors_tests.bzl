@@ -104,6 +104,29 @@ def warnings_as_errors_test_suite(name, tags = []):
             target_under_test = "//test/fixtures/warnings_as_errors:split_warning_groups",
         )
 
+    for mnemonic in ["SwiftCompile", "SwiftDeriveFiles"]:
+        action_command_line_test(
+            name = "{}_custom_{}".format(name, mnemonic),
+            expected_argv = [
+                "-debug-diagnostic-names",
+                "-Xwrapped-swift=-werror-id=chosen_id",
+                "-Xwrapped-swift=-werror-id-pattern.filtered_id=selected message",
+                "-Xwrapped-swift=-werror-no-id-pattern=unidentified message",
+                "-Werror DeprecatedDeclaration",
+            ],
+            mnemonic = mnemonic,
+            tags = all_tags,
+            target_under_test = "//test/fixtures/warnings_as_errors:custom_configuration_library",
+        )
+
+    action_command_line_test(
+        name = "{}_mixed_custom".format(name),
+        expected_argv = ["-Xwrapped-swift=-werror-id=chosen_id"],
+        mnemonic = "SwiftCompile",
+        tags = all_tags,
+        target_under_test = "//test/fixtures/warnings_as_errors:mixed_custom_configuration_swift",
+    )
+
     native.test_suite(
         name = name,
         tags = all_tags,

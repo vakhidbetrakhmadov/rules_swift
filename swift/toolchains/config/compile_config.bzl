@@ -143,6 +143,10 @@ def compile_action_configs(
 
     #### Flags that control compilation outputs
     action_configs = [
+        ActionConfigInfo(
+            actions = [SWIFT_ACTION_COMPILE, SWIFT_ACTION_DERIVE_FILES],
+            configurators = [_custom_werror_configurator],
+        ),
         # Emit object file(s).
         ActionConfigInfo(
             actions = [SWIFT_ACTION_COMPILE],
@@ -1634,11 +1638,7 @@ def command_line_objc_copts(compilation_mode, cpp_fragment, objc_fragment):
             ]
 
     clang_copts = cpp_fragment.objccopts + legacy_copts
-    return [
-        ActionConfigInfo(
-            actions = [SWIFT_ACTION_COMPILE, SWIFT_ACTION_DERIVE_FILES],
-            configurators = [_custom_werror_configurator],
-        ),copt for copt in clang_copts if copt != "-g"]
+    return [copt for copt in clang_copts if copt != "-g"]
 
 def _output_or_file_map(output_file_map, outputs, args):
     """Adds the output file map or single object file to the command line."""

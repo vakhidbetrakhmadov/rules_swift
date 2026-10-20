@@ -1,5 +1,6 @@
 load("@apple_support//rules:universal_binary.bzl", "universal_binary")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//test:transitions.bzl", "transition_test")
 
 licenses(["notice"])
@@ -228,4 +229,15 @@ transition_test(
     size = "small",
     target = ":worker_protocol_test",
     worker_protocol = "proto",
+)
+
+sh_test(
+    name = "custom_werror_test",
+    srcs = ["custom_werror_test.sh"],
+    args = ["$(rootpath :worker)"],
+    data = [":worker"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
 )

@@ -35,8 +35,8 @@ promoted to errors unconditionally.
         "id_with_patterns": attr.string_list_dict(
             default = {},
             doc = """\
-`Dict` mapping strings to lists of strings. Maps warning diagnostic IDs to multiple 
-regex patterns. A warning message must match at least one of the corresponding 
+`Dict` mapping strings to lists of strings. Maps warning diagnostic IDs to multiple
+regex patterns. A warning message must match at least one of the corresponding
 patterns before it is promoted to an error.
 """,
         ),
@@ -46,7 +46,7 @@ patterns before it is promoted to an error.
 `List` of strings. Contains regex patterns for warning messages that do not have a
 diagnostic ID. These warnings will be promoted to errors if their message matches
 one of the patterns.
-"""
+""",
         ),
     },
     doc = """\

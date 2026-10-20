@@ -515,7 +515,7 @@ int SwiftRunner::Run(std::ostream* stderr_stream, bool stdout_to_stderr) {
 
   std::ostringstream captured_stderr;
   std::ostream* compiler_stderr = (warnings_as_errors_patterns_.empty() &&
-       no_id_warnings_as_errors_patterns_.empty())
+                                   no_id_warnings_as_errors_patterns_.empty())
                                       ? stderr_stream
                                       : &captured_stderr;
   if (hermetic_pcm_) {
@@ -524,8 +524,8 @@ int SwiftRunner::Run(std::ostream* stderr_stream, bool stdout_to_stderr) {
         ArgsWithResponseFile(tool_args_, args_, *response_file);
     exit_code = RunHermeticPcm(spawn_args, &job_env_, compiler_stderr);
   } else {
-    exit_code =
-        SpawnJob(tool_args_, args_, &job_env_, compiler_stderr, stdout_to_stderr);
+    exit_code = SpawnJob(tool_args_, args_, &job_env_, compiler_stderr,
+                         stdout_to_stderr);
   }
 
   ProcessDiagnostics(captured_stderr.str(), *stderr_stream, exit_code);
@@ -784,7 +784,8 @@ std::vector<std::string> SwiftRunner::ParseArguments(Iterator itr) {
             id_and_pattern.second);
       } else if (absl::ConsumePrefix(&value, "-werror-no-id-pattern=")) {
         no_id_warnings_as_errors_patterns_.insert(std::string(value));
-      } else if (absl::ConsumePrefix(&value, "-global-index-store-import-path=")) {
+      } else if (absl::ConsumePrefix(&value,
+                                     "-global-index-store-import-path=")) {
         global_index_store_import_path_ = std::string(value);
       } else if (absl::ConsumePrefix(&value, "-generated-header-rewriter=")) {
         generated_header_rewriter_path_ = std::string(value);
@@ -1036,31 +1037,34 @@ int SwiftRunner::PerformLayeringCheck(std::ostream& stderr_stream,
 }
 
 namespace {
-bool MatchesAny(const std::string& text, const std::set<std::string>& patterns) {
+bool MatchesAny(const std::string& text,
+                const std::set<std::string>& patterns) {
   for (auto pattern : patterns) {
-      if (std::regex_search(text, std::regex(pattern))) return true;
+    if (std::regex_search(text, std::regex(pattern))) return true;
   }
   return false;
 }
 
-std::unique_ptr<std::string> PromotedWarningLine(const std::smatch& warning_matches, const std::optional<std::string>& ansi_sequence) {
+std::unique_ptr<std::string> PromotedWarningLine(
+    const std::smatch& warning_matches,
+    const std::optional<std::string>& ansi_sequence) {
   std::ostringstream modified_line_stream;
   modified_line_stream << warning_matches.prefix();
   if (ansi_sequence.has_value() && !ansi_sequence->empty()) {
-    modified_line_stream << "\x1b[1;31m"; // red color
+    modified_line_stream << "\x1b[1;31m";  // red color
   }
   modified_line_stream << "error: ";
   modified_line_stream << warning_matches.suffix();
   modified_line_stream << " (promoted_from_warning)";
-  
+
   return std::make_unique<std::string>(modified_line_stream.str());
 }
 
 }  // namespace
 
 void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
-                        std::ostream &stderr_stream,
-                        int &exit_code) {
+                                     std::ostream& stderr_stream,
+                                     int& exit_code) {
   if (stderr_output.empty()) {
     // Nothing to do if there was no output.
     return;
@@ -1068,7 +1072,8 @@ void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
 
   // Match the "warning: " prefix on a message, also capturing the preceding
   // ANSI color sequence if present.
-  std::regex const warning_pattern{"((\\x1b\\[(?:\\d+)(?:;\\d+)*m)?warning:\\s)"};
+  std::regex const warning_pattern{
+      "((\\x1b\\[(?:\\d+)(?:;\\d+)*m)?warning:\\s)"};
   // When `-debug-diagnostic-names` is enabled, names are printed as identifiers
   // in square brackets, either at the end of the string or followed by a
   // semicolon (for wrapped diagnostics). Nothing guarantees this for the
@@ -1085,12 +1090,12 @@ void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
     if (std::regex_search(line, warning_matches, warning_pattern)) {
       std::optional<std::string> ansi_sequence = warning_matches[2];
 
-      std::sregex_iterator diagnostic_names_begin(line.begin(), 
-                                                  line.end(), 
+      std::sregex_iterator diagnostic_names_begin(line.begin(), line.end(),
                                                   diagnostic_name_pattern);
       std::sregex_iterator diagnostic_names_end;
       if (diagnostic_names_begin == diagnostic_names_end) {
-        if (MatchesAny(warning_matches.suffix(), no_id_warnings_as_errors_patterns_)) {
+        if (MatchesAny(warning_matches.suffix(),
+                       no_id_warnings_as_errors_patterns_)) {
           modified_line = PromotedWarningLine(warning_matches, ansi_sequence);
 
           if (exit_code == 0) {
@@ -1098,16 +1103,21 @@ void SwiftRunner::ProcessDiagnostics(std::string stderr_output,
           }
         }
       } else {
-        for (std::sregex_iterator i = diagnostic_names_begin; i != diagnostic_names_end; ++i) {
+        for (std::sregex_iterator i = diagnostic_names_begin;
+             i != diagnostic_names_end; ++i) {
           std::string diagnostic_name = (*i)[1].str();
 
-          auto hasPatterns = warnings_as_errors_patterns_.find(diagnostic_name) != warnings_as_errors_patterns_.end();
+          auto hasPatterns =
+              warnings_as_errors_patterns_.find(diagnostic_name) !=
+              warnings_as_errors_patterns_.end();
           if (!hasPatterns) {
             continue;
           }
 
-          std::set<std::string> patterns = warnings_as_errors_patterns_[diagnostic_name];
-          if (!patterns.empty() && !MatchesAny(warning_matches.suffix(), patterns)) {
+          std::set<std::string> patterns =
+              warnings_as_errors_patterns_[diagnostic_name];
+          if (!patterns.empty() &&
+              !MatchesAny(warning_matches.suffix(), patterns)) {
             continue;
           }
 
